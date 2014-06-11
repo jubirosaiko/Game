@@ -1,0 +1,300 @@
+#include "appEnv.hpp"
+
+// アプリのウインドウサイズ
+enum Window {
+	WIDTH = 1800,
+	HEIGHT = 900
+};
+
+// 
+// メインプログラム
+// 
+int main() {
+	// アプリウインドウの準備
+	AppEnv app_env(Window::WIDTH, Window::HEIGHT);
+
+	// タイトル画面
+	{
+		// タイトル画像
+		Texture title_image("res/title.png");
+
+		// 「Click to Start」演出用変数を用意
+		float title_angle = 0.0;
+
+		// メインループ
+		while (1) {
+			// ウインドウが閉じられたら終了
+			if (!app_env.isOpen()) return 0;
+
+			// 描画準備
+			app_env.setupDraw();
+
+			// マウスのボタンがクリックされたらゲーム本編へ
+			//if (app_env.isPushButton(Mouse::LEFT))  break;
+			//if (app_env.isPushButton(Mouse::RIGHT)) break;
+			if (app_env.isPushKey(GLFW_KEY_ENTER)) break;
+			
+			// タイトルロゴ
+			drawTextureBox(0 - 279 / 2, 40 - 285 / 2, 279, 285,
+				0, 0, 279, 285,
+				title_image,
+				Color(1, 0.25, 0.25));
+
+			// 「Click to Start」演出用変数を変更
+			title_angle += 0.05;
+			// sinの値の絶対値を色に利用
+			float title_color = std::abs(std::sin(title_angle));
+
+			// 「Click to Start」
+			drawTextureBox(0 - 512 / 2, -Window::HEIGHT / 2, 512, 66,
+				0, 297, 512, 66,
+				title_image,
+				Color(title_color, title_color, title_color));
+
+			// 画面を更新
+			app_env.update();
+		}
+	}
+	//画面更新時にキー入力状態を初期化
+	app_env.flushInput();
+	// ゲーム本編
+	{
+
+		// 描画準備
+		app_env.setupDraw();
+
+		Texture a("res/moon.png");
+		/*自キャラの操作*/
+
+		//キャラの初期位置
+		int x = 0;
+		int y = 0;
+		//弾の発射位置
+		int x1 = x + 2;
+		int y1 = y + 35;
+		//歩く速さ
+		int move = 5;
+		//弾の速さ
+		int v = 20;
+
+		//弾表示（初期）
+		bool shot = false;
+		//弾の方向
+		bool course = true;
+		//弾の数値（数）
+		struct Myshot{
+
+			bool active;
+
+			int x2;
+			int v2;
+		};
+
+		// ボールを１つ生成
+		Myshot creatshot{ true, x1, v };
+		/*{
+			Myshot shotnum;
+
+			shotnum.active = true;
+
+			shotnum.x2 = x2;
+			shotnum.v2 = v2;
+
+			return shotnum;
+
+		}*/
+			
+			//structで作ったやつを入れる
+			/*(Vec2f pos, AppEnv& app_env) {
+			shotnum shotone;
+
+			shotone.active = true;
+
+			shotone.pos = pos;
+
+			shotone.speed.x() = v;
+			shotone.speed.y() = 0;
+
+			return shotone;
+		};*/
+		
+		// メインループ
+		while (1) {
+			// ウインドウが閉じられたら終了
+			if (!app_env.isOpen()) return 0;
+			//std::cout <<  play_time << std::endl;デバッグでの関数表示例
+			// アニメーション用に使うカウンタ
+			int frame_count = 0;
+
+			while (1) {
+				if (!app_env.isOpen()) return 0;
+
+
+				//配列で用意
+				Texture stand[] = {
+					//右向き立ち
+					Texture("res/rok1-5.png"),
+					//右向き歩き
+					Texture("res/rok1-6.png"),
+					Texture("res/rok1-7.png"),
+					Texture("res/rok1-8.png"),
+					Texture("res/rok1-9.png"),
+					//左向き立ち
+					Texture("res/rok1.png"),
+					//左向き歩き
+					Texture("res/rok1-1.png"), 
+					Texture("res/rok1-2.png"), 
+					Texture("res/rok1-3.png"), 
+					Texture("res/rok1-4.png"),		
+					//右向きジャンプ（斜め飛び付加）
+					//左向きジャンプ（斜め飛び付加）
+					//右向き攻撃
+					//右向き歩き攻撃
+					//左向き攻撃
+					//左向き歩き攻撃
+					//右向きジャンプ攻撃
+					//左向きジャンプ攻撃
+					//右向きスライディング
+					//左向きスライディング
+
+				};
+
+				//弾の配列
+				enum{ SHOT_NUM = 10 };
+				Myshot shotnums[SHOT_NUM];
+				for (int i = 0;  i < SHOT_NUM; ++i){
+					shotnums[i].active = false;
+				}
+
+				if (app_env.isPushKey(GLFW_KEY_ENTER)) {
+					for (int i = 0; i < SHOT_NUM; ++i) {
+						if (shotnums[i].active == false) {
+							shotnums[i] = creatshot;
+
+							// ボールを一個作ったらループを抜ける
+							break;
+						}
+					}
+				}
+
+				// アニメーション用に使うカウンタ
+				int frame_count = 0;
+
+				// 配列から取り出す位置を決める(0 ~ 9)自キャラモーション
+				int index = 0;
+				//配列から取り出す位置を決める
+
+				while (1) {
+					if (!app_env.isOpen()) return 0;
+					
+					//右側:ENTERを押したら弾が表示/発射される
+						if (app_env.isPushKey(GLFW_KEY_ENTER)){
+							shot = true;
+							x1 = x + 75;
+
+							if (course == false){
+								v = -20;
+							}
+							else if (course == true){
+								v = 20;
+							}
+						}
+						
+						//弾左側に発射
+						
+
+						if (shot == true){
+							x1 += v;
+						}
+									
+						// 弾の横幅制限
+							//右
+						if ((x1 > (Window::WIDTH) / 2 - 10)){
+							shot = false;
+						}
+						//左
+						else if ((x1 < -(Window::WIDTH) / 2 + 50)){
+							shot = false;
+						}
+
+			///////////////////////////////////////////////////////		
+
+					// 描画準備
+					app_env.setupDraw();
+					//右に歩く
+					//移動制限（右）
+					if (app_env.isPressKey('D') && !(x > (Window::WIDTH) / 2 - 100)){
+						frame_count += 3;
+						x += move;
+						index = (frame_count / 30) % 4 + 1;
+						course = true;
+					}
+					//離すと右向き立ち（アニメーション初期化）
+					if (app_env.isPullKey('D'))
+					{
+						index = 0;//
+						frame_count = 0;
+					}
+					//左に歩く
+					if (app_env.isPressKey('A') && !(x < -(Window::WIDTH) / 2 )){
+						frame_count += 3;
+						x -= move;
+						index = (frame_count / 30) % 4 + 6;
+						course = false;
+						
+					}
+					//離すと左向き立ち（アニメーション初期化）
+					if (app_env.isPullKey('A')){
+						index = move;
+						frame_count = 0;
+					}
+					
+					
+					//右向きジャンプ
+					//if (app_env.isPushKey('')){
+					
+				//	x += 2, y +=2;
+				//}
+					
+					//移動制限（右）
+					
+					//球の移動if (app_env.isPushKey(GLFW_KEY_ENTER)){
+						//x1 += 4;
+						//elseif is{}
+					//}
+
+					drawTextureBox(-900, -450, 1800, 900,
+						0, 0, 512, 512,
+						a,
+						Color(1, 1, 1));
+
+					drawTextureBox(x, y, 100, 100,
+						0, 0, 512, 512,
+						stand[index],
+						Color(1, 1, 1));
+					
+					drawFillBox(-900, -450, 100, 100,
+						Color(1, 1, 1));
+
+					if (shot){//自機の弾
+						drawFillCircle(x1, y1,
+							13, 7,
+							15,
+							Color(0.3, 0.5, 0.9));
+					}
+					
+					// 画面を更新
+					app_env.update();
+				}
+			}
+			
+					
+				
+			
+
+			// ------ ここまで --------
+
+			// アプリ終了
+		}
+	}
+}
