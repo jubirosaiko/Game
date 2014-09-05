@@ -1,0 +1,562 @@
+//
+// アプリ雛形
+// ※ファイル分割対応版
+//
+
+#include "lib/appEnv.hpp"
+#include <iostream>
+using namespace std;
+#define MAP_HEIGHT 10
+#define MAP_WIDTH 60
+#define MAPCHIP_SIZE 64
+#define STATE_NONE 0					//　オブジェクトが存在していない
+#define STATE_LIVE 1					//　オブジェクトが存在
+#define ENEMY1 2                       //敵①
+#define ENEMY2 2                       //敵2
+#define PLAYER 3                       //自キャラ
+
+//テクスチャ同士の当り判定
+//tex1_x, tex2_x テクスチャのｘ座標
+//tex1_y, tex2_y テクスチャのｙ座標
+//tex1_xsize, tex2_xsize テクスチャのｘ軸での大きさ（幅）
+//tex1_ysize, tex2_ysize テクスチャのｙ軸での大きさ（高さ）
+//壁の座標＋スクロール
+bool Texture_on_Texture(float tex1_x, float tex1_y, float tex1_xsize, float tex1_ysize,
+	float tex2_x, float tex2_y, float tex2_xsize, float tex2_ysize){
+	if (tex1_x + tex1_xsize >= tex2_x&& tex1_x <= tex2_x + tex2_xsize){
+		if (tex1_y + tex1_ysize >= tex2_y && tex1_y <= tex2_y + tex2_ysize){
+			return true;
+		}
+	}
+	return false;
+}
+
+// アプリのウインドウサイズ
+enum Window {
+	WIDTH = 1600,
+	HEIGHT = 768
+};
+
+
+// ジャンプするオブジェクトを構造体で定義
+struct Jump {
+
+	float y;
+	float vy;
+
+	bool jumping;
+};
+
+//ダッシュするオブジェクトを構造体で定義
+struct Dash{
+
+	float y;
+	float vx;
+
+	bool dashing;
+};
+
+// ジャンプ値からを変数で用意
+const float jump_power = 20.0f;
+
+// 重力を変数で用意
+const float gravity = -1.0f;
+
+//ダッシュ力を変数で用意
+const float dash_power = 20.0f;
+
+// 
+// メインプログラム
+// 
+int main() {
+	// アプリウインドウの準備
+	AppEnv app_env(Window::WIDTH, Window::HEIGHT,
+		false, false);
+	while (1){
+		// ジャンプするオブジェクトを用意
+		Jump jump = {
+			(-HEIGHT / 2.0f),
+			false
+		};
+
+		//ダッシュするオブジェクトを用意
+		Dash dash = {
+			0.0f,
+			false,
+		};
+
+		//ウィンドウの位置を変える
+		app_env.windowPosition(Vec2i(30, 100));
+		//タイトル画面
+		{
+			Texture title("res/title.png");
+			Texture title_1("res/title_1.png");
+
+
+			while (1) {
+				// アプリウインドウが閉じられたらプログラムを終了
+				if (!app_env.isOpen()) return 0;
+
+				// 描画準備
+				app_env.setupDraw();
+
+				// ここに描画処理を書く
+				//
+				if (app_env.isPushKey(GLFW_KEY_ENTER)) break;
+
+				drawFillCircle(100, 100, 10 ^ 2, 10 ^ 2, 100, Color(1, 1, 1));
+				drawFillCircle(0, 250, 10 ^ 2, 10 ^ 2, 100, Color(1, 1, 1));
+				drawTextureBox(-250, 100, 512, 128, 0, 0, 256, 64, title, Color(1, 1, 1));
+
+				// 画面更新
+				app_env.update();
+			}
+		}
+		//画面更新時にキー入力状態を初期化
+		app_env.flushInput();
+
+		//ゲーム本編
+		{
+			int MapData[MAP_HEIGHT][MAP_WIDTH] =
+			{
+				{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+				{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 6, 6, 6, 6, 6, 6, 6, 6, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+				{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+				{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 7, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+				{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+				{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1 },
+				{ 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 8, 0, 1 },
+				{ 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+				{ 1, 0, 0, 0, 2, 4, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+				{ 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+			};
+
+			int mx = 0;
+			int my = 0;
+
+
+
+
+
+			enum{
+				width_max = WIDTH,
+				height_max = HEIGHT
+			};
+
+			struct MAP
+			{
+				int MAP_x, MAP_y;
+			};
+
+			float x = -WIDTH / 2;
+			float y = -HEIGHT / 2;
+			//通常移動量
+			float move = 7;
+			// アニメーション用に使うカウンタ
+			int frame_count = 0;
+			// 配列から取り出す位置を決める(0 ~ 9)自キャラモーション
+			int index = 0;
+			//初期位置とか
+			dash.vx = -WIDTH / 2;
+			jump.y = -240;
+			//ダッシュ量
+			int dash_time = 60 * 3;
+			//ダッシュフラグ
+			bool dash_counter = false;
+			//向き判定用
+			bool course = true;
+			//画面端
+			bool side = true;
+			//スクロール用
+			int scroll_count = 0;
+			bool stage_move = false;
+			//攻撃用
+			bool attack = false;
+			//キャラクタ当たり判定
+			float R_x = 128;
+			float L_x = dash.vx;
+			float O_y = 128;
+			float U_y = jump.y;
+
+			float OL_x = 0;
+			float OR_x = 100;
+			float UO_y = 240;
+			float OO_y = 100;
+			
+			//テクスチャ同士の当り判定
+			//tex1_x, tex2_x テクスチャのｘ座標
+			//tex1_y, tex2_y テクスチャのｙ座標
+			//tex1_xsize, tex2_xsize テクスチャのｘ軸での大きさ（幅）
+			//tex1_ysize, tex2_ysize テクスチャのｙ軸での大きさ（高さ）
+			/*bool Texture_on_Texture(int L_x, int U_y, int R_x, int O_y,
+				int OL_x, int UO_y, int OR_x, int OO_y)
+			{
+				if (L_x + R_x >= OL_x && L_x <= OL_x + OR_x){
+					if (U_y + O_y >= UO_y && U_y <= UO_y + OO_y){
+						return true;
+					}
+				}
+				return false;
+			};*/
+			
+			
+
+			//画像(未準備)
+			Texture STAGE("res/STAGE6.png");
+			Texture TIGER[] =
+			{
+				//右向き立ち
+				("res/R_stand.png"),
+				//右向き歩き
+				("res/R_walk0.png"),
+				("res/R_walk1.png"),
+				("res/R_walk2.png"),
+				("res/R_walk3.png"),
+				("res/R_walk4.png"),
+				("res/R_walk5.png"),
+				("res/R_walk6.png"),
+				("res/R_walk7.png"),
+				("res/R_walk8.png"),
+				("res/R_walk9.png"),
+				//左向き立ち
+				("res/L_stand.png"),
+				//左向き歩き
+				("res/L_walk0.png"),
+				("res/L_walk1.png"),
+				("res/L_walk2.png"),
+				("res/L_walk3.png"),
+				("res/L_walk4.png"),
+				("res/L_walk5.png"),
+				("res/L_walk6.png"),
+				("res/L_walk7.png"),
+				("res/L_walk8.png"),
+				("res/L_walk9.png"),
+				//右ダッシュ
+				("res/R_dash0.png"),
+				("res/R_dash1.png"),
+				//左ダッシュ
+				("res/L_dash0.png"),
+				("res/L_dash1.png"),
+				//確認用
+				("res/R_jump3.png"),
+				/*("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				("res/.png"),
+				*/
+			};//みかん（左パンチ）
+			//画像用
+			int bg_size_x = -WIDTH / 2;
+			int bg_size_y = -HEIGHT / 2;
+			int bg_camera_x = 0;
+			int bg_camera_y = 0;
+
+			while (1) {
+				// アプリウインドウが閉じられたらプログラムを終了
+				if (!app_env.isOpen()) return 0;
+
+				// 描画準備
+				app_env.setupDraw();
+
+				/*
+				if ((dash.vx > (Window::WIDTH) / 2 - 100) || (dash.vx < -(Window::WIDTH) / 2))
+				{
+				side = false;
+				}
+
+				if (side == false)
+				{
+				dash.dashing = false;
+				}
+				*/
+				//キャラ操作
+				if (app_env.isPressKey('D') && !(dash.vx > (Window::WIDTH) / 2 - 550))
+				{
+					dash.vx += move;
+					frame_count += 10;
+					index = (frame_count / 30) % 10 + 1;
+					course = true;
+				}
+
+				if (app_env.isPressKey('D') && (dash.vx > (Window::WIDTH) / 2 - 550))
+				{
+
+					frame_count += 10;
+					index = (frame_count / 30) % 10 + 1;
+					course = true;
+				}
+
+				if (app_env.isPressKey('D'))
+				{
+					if (dash.vx > (Window::WIDTH) / 2 - 550)
+					{
+						bg_camera_x += 1;
+						scroll_count += 1;
+
+					}
+					else if (dash.vx > (Window::WIDTH) / 2 - 550)
+					{
+						bg_camera_x += 0;
+						scroll_count += 0;
+					}
+
+				}
+
+
+				if (app_env.isPullKey('D'))
+				{
+					index = 0;
+					frame_count = 0;
+				}
+
+				/*if (app_env.isPressKey('A') && !(dash.vx < -(Window::WIDTH) / 2 + 500 ))*/
+				if (app_env.isPressKey('A') && !(dash.vx < -(Window::WIDTH) / 2))
+				{
+					dash.vx -= move;
+					frame_count += 10;
+					index = (frame_count / 30) % 10 + 12;
+					course = false;
+				}
+				if (app_env.isPressKey('A') && (dash.vx < -(Window::WIDTH) / 2))
+				{
+					frame_count += 10;
+					index = (frame_count / 30) % 10 + 12;
+					course = false;
+				}
+				/*if (app_env.isPressKey('A') && (dash.vx < -(Window::WIDTH) / 2 + 500))
+				{
+				frame_count += 10;
+				index = (frame_count / 30) % 10 + 12;
+				course = false;
+				}*/
+
+				/*if (app_env.isPressKey('A'))
+				{
+				if (dash.vx < -(Window::WIDTH / 2) + 500)
+				{
+				bg_camera_x -= 1;
+				dash.vx += 0;
+				scroll_count -= 1;
+				}
+				}*/
+
+				if (app_env.isPullKey('A'))
+				{
+					index = 11;
+					frame_count = 0;
+					course = false;
+				}
+
+				// Wクリックでジャンプ開始
+				if (app_env.isPushKey('W')) {
+					if (!jump.jumping) {
+						jump.jumping = true;
+						jump.vy = jump_power;
+						dash.dashing = false;
+					}
+				}
+
+				// ジャンプ中の動作
+				// TIPS:等加速運動の法則を利用
+				// s = v0 * t + 0.5 * a * t^2
+				// v = v0 + a * t
+				if (jump.jumping) {
+					jump.y += jump.vy + 0.5 * gravity;
+					jump.vy += gravity;
+
+					// 右向き着地
+					if (jump.y <= -240 && course == true)
+					{
+						jump.y = -240;
+						jump.jumping = false;
+						index = 0;
+
+					}
+
+					if (jump.y <= -240 && course == false)
+					{
+						jump.y = -240;
+						jump.jumping = false;
+						index = 11;
+
+					}
+
+					//画面更新時にキー入力状態を初期化、ジャンプ中に'C'を押下時着地後にダッシュしない為
+					app_env.flushInput();
+				}
+
+				//Cクリックでダッシュ開始
+				if (app_env.isPushKey('C')){
+					if (!dash.dashing){
+						dash.dashing = true;
+						dash_time = 0;         //ダッシュ開始した瞬間
+						index = 23;
+					}
+				}
+
+				if (dash.dashing == true && jump.jumping == false && course == true)
+				{
+					dash.vx += dash_power;
+					dash_time += 1;				//ダッシュ開始した瞬間からダッシュ中
+					index = 23;
+
+				}
+
+				//			{
+				//			dash.dashing = false;
+				//		}
+				//右側ダッシュ終了
+				if (dash_time == 10 && course == true)				//ダッシュ開始からdash_timeが5になったら
+				{
+					dash.dashing = false;
+					dash_time = 0;				//ダッシュが終了したのでdash_timeを0にすることで再度ダッシュできるようにする
+					index = 0;
+
+				}
+
+				if (app_env.isPushKey('C') && course == false){
+					{
+						if (!dash.dashing)
+						{
+							dash.dashing = true;
+							dash_time = 0;
+							index = 25;
+						}
+					}
+				}
+
+				//左側にダッシュ
+				if (dash.dashing == true && course == false)
+				{
+					dash.vx -= dash_power;
+					dash_time += 1;
+					index = 25;
+				}
+
+				//左側ダッシュ終了
+				if (dash_time == 10 && course == false)				//ダッシュ開始からdash_timeが5になったら
+				{
+					dash.dashing = false;
+					dash_time = 0;				//ダッシュが終了したのでdash_timeを0にすることで再度ダッシュできるようにする
+					index = 11;
+
+				}
+
+				if (dash.vx > (Window::WIDTH) / 2 - 100)
+				{
+					dash.dashing = false;
+					index = 0;
+
+				}
+
+
+				if (scroll_count == 2000)
+				{
+					break;
+				}
+
+				//右向き攻撃
+				if (app_env.isPressKey(GLFW_KEY_ENTER) && course == true)
+				{
+					attack = true;
+					index = 26;
+				}
+				//攻撃終了
+				if (app_env.isPullKey(GLFW_KEY_ENTER) && course == true)
+				{
+					attack = false;
+					index = 0;
+				}
+
+				//左向き攻撃
+				if (app_env.isPushKey(GLFW_KEY_ENTER) && course == false)
+				{
+					attack = true;
+					index = 27;
+				}
+				//攻撃終了
+				if (app_env.isPullKey(GLFW_KEY_ENTER) && course == false)
+				{
+					attack = false;
+					index = 11;
+				}
+
+				for (my = 0; my < 15; my++)
+				{
+					for (mx = 0; mx < 60; mx++)
+					{
+						if (MapData[my][mx] == 1)
+						{
+							drawFillBox(OL_x, UO_y, OR_x, OO_y, Color(0.5, 1.0, 0.8));
+						}
+						if (MapData[my][mx] == 3)
+						{
+							drawFillCircle(100, 100, 10 * 10, 10 * 10, 10, Color(0.5, 0.3, 0.1));
+						}
+					}
+				}
+
+				bool hit1 = Texture_on_Texture(L_x, U_y, R_x, O_y,
+					OL_x, UO_y, OR_x, OO_y);
+			{
+					if (hit1)
+					{
+						dash.vx += 0;
+					}
+				}
+
+				//背景
+				drawTextureBox(bg_size_x, bg_size_y, WIDTH * 5, HEIGHT, bg_camera_x, bg_camera_y, 1024, 256, STAGE, Color(1, 1, 1));
+				//自キャラ表示
+				drawTextureBox(dash.vx, jump.y, 128, 128, 0, 0, 256, 256, TIGER[index], Color(1, 1, 1));
+				drawFillBox(0, 0, 20, 20, Color(3, 3, 110, 1));
+				drawFillBox(300, 0, 20, 20, Color(3, 3, 121, 1));
+				drawFillBox(-300, 0, 20, 20, Color(3, 3, 131, 1));
+				drawFillBox(0, -240, 100, 100, Color(0.5, 1.0, 0.8));
+				//試し
+
+
+
+				// 
+				// ここに描画処理を書く
+				//
+
+				//デバッグ用
+				if (app_env.isPushKey('P')) break;
+
+
+				// 画面更新
+				app_env.update();
+			}
+		}
+		//リザルト画面
+		{
+			while (1) {
+				// ウインドウが閉じられたら終了
+				if (!app_env.isOpen()) return 0;
+
+				// 描画準備
+				app_env.setupDraw();
+
+
+				drawFillBox(-WIDTH / 2, -HEIGHT / 2, 100, 100, Color(10, 30, 50));
+
+				// 画面を更新
+				app_env.update();
+				if (app_env.isPushKey(GLFW_KEY_ENTER)) break;
+				if (!app_env.isOpen()) return 0;
+				if (app_env.isPushKey(GLFW_KEY_SPACE)) return 0;
+
+			}
+		}
+		// アプリ終了
+		app_env.flushInput();
+	}
+
+}
