@@ -2,9 +2,8 @@ void setup(){
   size(500,500);
 }
 
-float x=0;
-float y=0;
-boolean moveflag;
+float x=0, y=0;
+boolean move_flag;
 float enemy_max=10;
 float x_spd=1;
 
@@ -16,16 +15,16 @@ void draw(){
   }
   
   if(x<=0){
-    moveflag=true;
+    move_flag=true;
   }
   else if(x>width-enemy_max*30){ 
-    moveflag=false;
+    move_flag=false;
   }
   
   if(moveflag==true){
     x+=x_spd;
   }  
-  else if(moveflag==false){ 
+  else if(move_flag==false){ 
     x-=x_spd;
   }
   
