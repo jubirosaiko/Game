@@ -29,7 +29,7 @@ void draw(){
   }
   
   if(y > = 0 && y <= 390){
-    if(x <= 0){
+    if(x < = 0){
       y += 30;
     }
     else if(x > width-enemy_max*30){ 
